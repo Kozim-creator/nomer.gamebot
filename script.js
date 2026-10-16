@@ -1,18 +1,13 @@
 
 "use strict";
 
-if (isAdmin(username, password)) {
-    localStorage.setItem("nomer_x_admin", "true");
+// ===== NOMER X SOZLAMALARI =====
+const ADMIN_LOGIN = "Kozim_creator";
+const ADMIN_PASSWORD = "Kozim_creator";
 
-    document.getElementById("authPanel").style.display = "none";
-    document.getElementById("gamePanel").style.display = "block";
+const STARTING_COINS = 50000;
+const SPIN_PRICE = 1000;
 
-    document.getElementById("adminNav").style.display = "inline-block";
-
-    showTab("adminTab");
-    renderAdmin();
-    return;
-}
 const ACCOUNTS_KEY = "nomer_x_accounts_v5";
 const SESSION_KEY = "nomer_x_session_v5";
 const TEMP_SESSION_KEY = "nomer_x_temporary_session";
@@ -24,6 +19,7 @@ const STARTER_CARS = [
   { id: "lamborghini", name: "Lamborghini", price: 100000 }
 ];
 
+// ===== MA'LUMOTLARNI SAQLASH =====
 function readJSON(key, fallback) {
   try {
     const value = localStorage.getItem(key);
@@ -50,12 +46,20 @@ function savePromos(promos) {
 }
 
 function currentSession() {
-  return readJSON(SESSION_KEY, null) ||
-    readJSON(TEMP_SESSION_KEY, null);
+  try {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) return JSON.parse(saved);
+
+    const temporary = sessionStorage.getItem(TEMP_SESSION_KEY);
+    return temporary ? JSON.parse(temporary) : null;
+  } catch {
+    return null;
+  }
 }
 
 function saveSession(session) {
-  const remember = document.getElementById("rememberMe").checked;
+  const rememberBox = document.getElementById("rememberMe");
+  const remember = Boolean(rememberBox && rememberBox.checked);
 
   if (remember) {
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -68,7 +72,9 @@ function saveSession(session) {
 
 function currentUser() {
   const session = currentSession();
+
   if (!session || session.admin) return null;
+
   return getAccounts()[session.username] || null;
 }
 
@@ -79,11 +85,15 @@ function saveCurrentUser(user) {
 }
 
 function repairPlayer(user) {
-  if (typeof user.coins !== "number") user.coins = STARTING_COINS;
+  if (typeof user.coins !== "number") {
+    user.coins = STARTING_COINS;
+  }
+
   if (!Array.isArray(user.cars)) user.cars = [];
   if (!Array.isArray(user.numbers)) user.numbers = [];
   if (!Array.isArray(user.history)) user.history = [];
   if (!Array.isArray(user.usedPromos)) user.usedPromos = [];
+
   return user;
 }
 
@@ -92,12 +102,16 @@ function message(id, text) {
   if (element) element.textContent = text;
 }
 
+// ===== RO'YXATDAN O'TISH =====
 function register() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value;
 
   if (username.length < 3 || password.length < 4) {
-    return message("authMessage", "Login kamida 3, parol 4 ta belgidan iborat bo‘lsin.");
+    return message(
+      "authMessage",
+      "Login kamida 3, parol kamida 4 ta belgidan iborat bo'lsin."
+    );
   }
 
   if (username.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
@@ -126,12 +140,18 @@ function register() {
   initialize();
 }
 
+// ===== LOGIN, ADMIN KIRISHI =====
 function login() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value;
 
-  if (username === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+  // Admin loginini katta-kichik harflarga sezgir bo'lmagan holda tekshiramiz.
+  if (
+    username.toLowerCase() === ADMIN_LOGIN.toLowerCase() &&
+    password === ADMIN_PASSWORD
+  ) {
     saveSession({ username: ADMIN_LOGIN, admin: true });
+    message("authMessage", "");
     initialize();
     return;
   }
@@ -140,40 +160,55 @@ function login() {
   const user = accounts[username];
 
   if (!user || user.password !== password) {
-    return message("authMessage", "Login yoki parol noto‘g‘ri.");
+    return message("authMessage", "Login yoki parol noto'g'ri.");
   }
 
   repairPlayer(user);
   saveCurrentUser(user);
   saveSession({ username });
+  message("authMessage", "");
   initialize();
 }
 
+// ===== AKKAUNTDAN CHIQISH =====
 function logout() {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(TEMP_SESSION_KEY);
   initialize();
 }
 
+// ===== BO'LIMLAR =====
 function showTab(id) {
   document.querySelectorAll(".tab").forEach(tab => {
     tab.hidden = tab.id !== id;
   });
 }
 
+// ===== BALANS =====
 function updateBalance() {
+  const balance = document.getElementById("balance");
+  if (!balance) return;
+
   const user = currentUser();
-  document.getElementById("balance").textContent =
-    user ? user.coins.toLocaleString("ru-RU") : STARTING_COINS.toLocaleString("ru-RU");
+
+  balance.textContent = user
+    ? user.coins.toLocaleString("ru-RU")
+    : STARTING_COINS.toLocaleString("ru-RU");
 }
 
+// ===== RAQAM YARATISH =====
 function randomPlate() {
   const letters = "ABCEHKMOPTXY";
-  const letter = () => letters[Math.floor(Math.random() * letters.length)];
+
+  const letter = () =>
+    letters[Math.floor(Math.random() * letters.length)];
+
   const digit = () => Math.floor(Math.random() * 10);
+
   return `${letter()}${digit()}${digit()}${digit()}${letter()}${letter()}`;
 }
 
+// ===== RAQAM AYLANTRISH =====
 function spinNumber() {
   const user = currentUser();
   if (!user) return;
@@ -185,7 +220,10 @@ function spinNumber() {
   user.coins -= SPIN_PRICE;
 
   const rare = Math.random() < 0.10;
-  const plate = rare ? "777" + randomPlate().slice(3) : randomPlate();
+  const plate = rare
+    ? "777" + randomPlate().slice(3)
+    : randomPlate();
+
   const price = rare
     ? 20000 + Math.floor(Math.random() * 80001)
     : 10000 + Math.floor(Math.random() * 40001);
@@ -200,23 +238,37 @@ function spinNumber() {
 
   user.numbers.push(number);
   user.history.unshift(number);
+
   saveCurrentUser(user);
 
-  document.getElementById("spinDisplay").textContent = plate;
-  message("spinResult", `${number.rarity}! Narxi: ${price.toLocaleString()} 🪙`);
+  const display = document.getElementById("spinDisplay");
+  if (display) display.textContent = plate;
+
+  message(
+    "spinResult",
+    `${number.rarity}! Narxi: ${price.toLocaleString()} 🪙`
+  );
 
   updateBalance();
   renderGame();
 }
 
+// ===== PROMOKOD =====
 function usePromo() {
   const user = currentUser();
   if (!user) return;
 
-  const code = document.getElementById("promoInput").value.trim().toUpperCase();
+  const code = document
+    .getElementById("promoInput")
+    .value.trim()
+    .toUpperCase();
+
   const promo = getPromos()[code];
 
-  if (!promo) return message("promoMessage", "Promokod topilmadi.");
+  if (!promo) {
+    return message("promoMessage", "Promokod topilmadi.");
+  }
+
   if (user.usedPromos.includes(code)) {
     return message("promoMessage", "Bu promokod oldin ishlatilgan.");
   }
@@ -226,15 +278,23 @@ function usePromo() {
 
   saveCurrentUser(user);
   updateBalance();
-  message("promoMessage", `${promo.amount} tanga qo‘shildi!`);
+
+  message("promoMessage", `${promo.amount} tanga qo'shildi!`);
 }
 
+// ===== ADMIN: TANGA BERISH =====
 function giveCoins() {
+  if (!currentSession()?.admin) return;
+
   const username = document.getElementById("adminPlayer").value.trim();
   const amount = Number(document.getElementById("adminCoins").value);
   const accounts = getAccounts();
 
-  if (!accounts[username] || !Number.isFinite(amount) || amount <= 0) {
+  if (
+    !accounts[username] ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
     return message("adminMessage", "Login yoki miqdorni tekshiring.");
   }
 
@@ -245,13 +305,25 @@ function giveCoins() {
   renderAdmin();
 }
 
+// ===== ADMIN: PROMOKOD YARATISH =====
 function createPromo() {
-  const code = document.getElementById("newPromo").value.trim().toUpperCase();
-  const amount = Number(document.getElementById("newPromoAmount").value);
+  if (!currentSession()?.admin) return;
 
-  if (!/^[A-Z0-9_-]{3,20}$/.test(code) ||
-      !Number.isFinite(amount) || amount <= 0) {
-    return message("adminMessage", "Promokod yoki mukofot noto‘g‘ri.");
+  const code = document
+    .getElementById("newPromo")
+    .value.trim()
+    .toUpperCase();
+
+  const amount = Number(
+    document.getElementById("newPromoAmount").value
+  );
+
+  if (
+    !/^[A-Z0-9_-]{3,20}$/.test(code) ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return message("adminMessage", "Promokod yoki mukofot noto'g'ri.");
   }
 
   const promos = getPromos();
@@ -267,6 +339,7 @@ function createPromo() {
   renderAdmin();
 }
 
+// ===== MASHINA SOTIB OLISH =====
 function buyCar(id) {
   const user = currentUser();
   if (!user) return;
@@ -284,21 +357,13 @@ function buyCar(id) {
 
   user.coins -= car.price;
   user.cars.push({ ...car });
+
   saveCurrentUser(user);
   updateBalance();
   renderGame();
 }
 
-function buyNumber(id) {
-  const user = currentUser();
-  if (!user) return;
-
-  const number = user.numbers.find(item => item.id === id);
-  if (!number) return;
-
-  alert("Bu raqam allaqachon sening garajingda.");
-}
-
+// ===== RAQAMNI SOTISH =====
 function sellNumber(id) {
   const user = currentUser();
   if (!user) return;
@@ -308,17 +373,23 @@ function sellNumber(id) {
 
   const number = user.numbers[index];
 
-  if (!confirm(`${number.plate} raqamini ${number.price.toLocaleString()} tangaga sotasanmi?`)) {
+  if (
+    !confirm(
+      `${number.plate} raqamini ${number.price.toLocaleString()} tangaga sotasanmi?`
+    )
+  ) {
     return;
   }
 
   user.coins += number.price;
   user.numbers.splice(index, 1);
+
   saveCurrentUser(user);
   updateBalance();
   renderGame();
 }
 
+// ===== MASHINANI SOTISH =====
 function sellCar(id) {
   const user = currentUser();
   if (!user) return;
@@ -329,27 +400,38 @@ function sellCar(id) {
   const car = user.cars[index];
   const refund = Math.floor(car.price * 0.7);
 
-  if (!confirm(`${car.name} mashinasini ${refund.toLocaleString()} tangaga sotasanmi?`)) {
+  if (
+    !confirm(
+      `${car.name} mashinasini ${refund.toLocaleString()} tangaga sotasanmi?`
+    )
+  ) {
     return;
   }
 
   user.coins += refund;
   user.cars.splice(index, 1);
+
   saveCurrentUser(user);
   updateBalance();
   renderGame();
 }
 
+// ===== ADMIN PANEL =====
 function renderAdmin() {
+  if (!currentSession()?.admin) return;
+
   const players = document.getElementById("playersList");
   const promoList = document.getElementById("promoList");
+
+  if (!players || !promoList) return;
 
   players.replaceChildren();
   promoList.replaceChildren();
 
   Object.values(getAccounts()).forEach(user => {
     const row = document.createElement("p");
-    row.textContent = `${user.username} — ${user.coins.toLocaleString()} 🪙`;
+    row.textContent =
+      `${user.username} — ${user.coins.toLocaleString()} 🪙`;
     players.appendChild(row);
   });
 
@@ -360,11 +442,13 @@ function renderAdmin() {
   });
 }
 
+// ===== O'YINNI EKRANGA CHIQARISH =====
 function renderGame() {
   const user = currentUser();
   if (!user) return;
 
-  document.getElementById("playerName").textContent = user.username;
+  const playerName = document.getElementById("playerName");
+  if (playerName) playerName.textContent = user.username;
 
   const carShop = document.getElementById("carShop");
   const numberShop = document.getElementById("numberShop");
@@ -372,7 +456,13 @@ function renderGame() {
   const myNumbers = document.getElementById("myNumbers");
   const historyList = document.getElementById("historyList");
 
+  if (!carShop || !numberShop || !garageCars || !myNumbers || !historyList) {
+    return;
+  }
+
+  // Mashina do'koni
   carShop.replaceChildren();
+
   STARTER_CARS.forEach(car => {
     const card = document.createElement("div");
     card.className = "item";
@@ -391,9 +481,12 @@ function renderGame() {
     carShop.appendChild(card);
   });
 
-  numberShop.innerHTML = "<p>Raqam olish uchun «Prokrutka» bo‘limiga kir.</p>";
+  numberShop.innerHTML =
+    "<p>Raqam olish uchun «Prokrutka» bo'limiga kir.</p>";
 
+  // Garajdagi mashinalar
   garageCars.replaceChildren();
+
   user.cars.forEach(car => {
     const card = document.createElement("div");
     card.className = "item";
@@ -402,7 +495,8 @@ function renderGame() {
     title.textContent = car.name;
 
     const price = document.createElement("p");
-    price.textContent = `Xarid narxi: ${car.price.toLocaleString()} 🪙`;
+    price.textContent =
+      `Xarid narxi: ${car.price.toLocaleString()} 🪙`;
 
     const button = document.createElement("button");
     button.textContent = "Mashina sotish (70%)";
@@ -412,7 +506,9 @@ function renderGame() {
     garageCars.appendChild(card);
   });
 
+  // Garajdagi raqamlar
   myNumbers.replaceChildren();
+
   user.numbers.forEach(number => {
     const card = document.createElement("div");
     card.className = "item";
@@ -421,7 +517,8 @@ function renderGame() {
     title.textContent = number.plate;
 
     const price = document.createElement("p");
-    price.textContent = `${number.rarity} — ${number.price.toLocaleString()} 🪙`;
+    price.textContent =
+      `${number.rarity} — ${number.price.toLocaleString()} 🪙`;
 
     const button = document.createElement("button");
     button.textContent = "Raqamni sotish";
@@ -431,24 +528,37 @@ function renderGame() {
     myNumbers.appendChild(card);
   });
 
+  // Raqamlar tarixi
   historyList.replaceChildren();
+
   user.history.forEach(item => {
     const row = document.createElement("p");
-    row.textContent = `${item.plate} — ${item.rarity} — ${item.price.toLocaleString()} 🪙 — ${item.date}`;
+    row.textContent =
+      `${item.plate} — ${item.rarity} — ` +
+      `${item.price.toLocaleString()} 🪙 — ${item.date}`;
+
     historyList.appendChild(row);
   });
 }
 
+// ===== SAYTNI ISHGA TUSHIRISH =====
 function initialize() {
   const session = currentSession();
+
   const authPanel = document.getElementById("authPanel");
   const gamePanel = document.getElementById("gamePanel");
   const adminNav = document.getElementById("adminNav");
+
+  if (!authPanel || !gamePanel || !adminNav) {
+    console.error("HTML ichida authPanel, gamePanel yoki adminNav topilmadi.");
+    return;
+  }
 
   if (!session) {
     authPanel.hidden = false;
     gamePanel.hidden = true;
     adminNav.hidden = true;
+
     updateBalance();
     return;
   }
@@ -457,7 +567,10 @@ function initialize() {
     authPanel.hidden = true;
     gamePanel.hidden = false;
     adminNav.hidden = false;
-    document.getElementById("playerName").textContent = "Admin";
+
+    const playerName = document.getElementById("playerName");
+    if (playerName) playerName.textContent = "Admin";
+
     showTab("adminTab");
     renderAdmin();
     return;
@@ -482,4 +595,5 @@ function initialize() {
   showTab("spinTab");
 }
 
+// ===== BOSHLASH =====
 initialize();

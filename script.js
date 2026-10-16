@@ -1,11 +1,18 @@
 
 "use strict";
 
-const STARTING_COINS = 50000;
-const SPIN_PRICE = 1000;
-const ADMIN_LOGIN = "kozim_admin";
-const ADMIN_PASSWORD = "Kozim_creator";
+if (isAdmin(username, password)) {
+    localStorage.setItem("nomer_x_admin", "true");
 
+    document.getElementById("authPanel").style.display = "none";
+    document.getElementById("gamePanel").style.display = "block";
+
+    document.getElementById("adminNav").style.display = "inline-block";
+
+    showTab("adminTab");
+    renderAdmin();
+    return;
+}
 const ACCOUNTS_KEY = "nomer_x_accounts_v5";
 const SESSION_KEY = "nomer_x_session_v5";
 const TEMP_SESSION_KEY = "nomer_x_temporary_session";

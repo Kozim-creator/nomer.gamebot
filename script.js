@@ -1,10 +1,8 @@
-
 "use strict";
 
-// ===== NOMER X SOZLAMALARI =====
+// NOMER X
 const ADMIN_LOGIN = "Kozim_creator";
 const ADMIN_PASSWORD = "Kozim_creator";
-
 const STARTING_COINS = 50000;
 const SPIN_PRICE = 1000;
 
@@ -19,12 +17,12 @@ const STARTER_CARS = [
   { id: "lamborghini", name: "Lamborghini", price: 100000 }
 ];
 
-// ===== MA'LUMOTLARNI SAQLASH =====
+// ---------- SAQLASH ----------
 function readJSON(key, fallback) {
   try {
     const value = localStorage.getItem(key);
     return value ? JSON.parse(value) : fallback;
-  } catch {
+  } catch (error) {
     return fallback;
   }
 }
@@ -52,7 +50,7 @@ function currentSession() {
 
     const temporary = sessionStorage.getItem(TEMP_SESSION_KEY);
     return temporary ? JSON.parse(temporary) : null;
-  } catch {
+  } catch (error) {
     return null;
   }
 }
@@ -72,7 +70,6 @@ function saveSession(session) {
 
 function currentUser() {
   const session = currentSession();
-
   if (!session || session.admin) return null;
 
   return getAccounts()[session.username] || null;
@@ -85,10 +82,7 @@ function saveCurrentUser(user) {
 }
 
 function repairPlayer(user) {
-  if (typeof user.coins !== "number") {
-    user.coins = STARTING_COINS;
-  }
-
+  if (typeof user.coins !== "number") user.coins = STARTING_COINS;
   if (!Array.isArray(user.cars)) user.cars = [];
   if (!Array.isArray(user.numbers)) user.numbers = [];
   if (!Array.isArray(user.history)) user.history = [];
@@ -102,31 +96,46 @@ function message(id, text) {
   if (element) element.textContent = text;
 }
 
-// ===== RO'YXATDAN O'TISH =====
+function formatCoins(value) {
+  return Number(value || 0).toLocaleString("ru-RU");
+}
+
+// ---------- RO‘YXATDAN O‘TISH ----------
 function register() {
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value;
+  const usernameEl = document.getElementById("username");
+  const passwordEl = document.getElementById("password");
+
+  if (!usernameEl || !passwordEl) {
+    alert("HTML ichida username yoki password elementi topilmadi.");
+    return;
+  }
+
+  const username = usernameEl.value.trim();
+  const password = passwordEl.value;
 
   if (username.length < 3 || password.length < 4) {
-    return message(
+    message(
       "authMessage",
-      "Login kamida 3, parol kamida 4 ta belgidan iborat bo'lsin."
+      "Login kamida 3 ta, parol kamida 4 ta belgidan iborat bo‘lsin."
     );
+    return;
   }
 
   if (username.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
-    return message("authMessage", "Bu login band.");
+    message("authMessage", "Bu login band.");
+    return;
   }
 
   const accounts = getAccounts();
 
   if (accounts[username]) {
-    return message("authMessage", "Bu login mavjud.");
+    message("authMessage", "Bu login allaqachon mavjud.");
+    return;
   }
 
   const user = {
-    username,
-    password,
+    username: username,
+    password: password,
     coins: STARTING_COINS,
     cars: [],
     numbers: [],
@@ -136,22 +145,33 @@ function register() {
 
   accounts[username] = user;
   saveAccounts(accounts);
-  saveSession({ username });
+  saveSession({ username: username });
+
   initialize();
 }
 
-// ===== LOGIN, ADMIN KIRISHI =====
+// ---------- LOGIN ----------
 function login() {
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value;
+  const usernameEl = document.getElementById("username");
+  const passwordEl = document.getElementById("password");
 
-  // Admin loginini katta-kichik harflarga sezgir bo'lmagan holda tekshiramiz.
+  if (!usernameEl || !passwordEl) {
+    alert("Login formasi topilmadi. HTML kodini tekshiring.");
+    return;
+  }
+
+  const username = usernameEl.value.trim();
+  const password = passwordEl.value;
+
   if (
     username.toLowerCase() === ADMIN_LOGIN.toLowerCase() &&
     password === ADMIN_PASSWORD
   ) {
-    saveSession({ username: ADMIN_LOGIN, admin: true });
-    message("authMessage", "");
+    saveSession({
+      username: ADMIN_LOGIN,
+      admin: true
+    });
+
     initialize();
     return;
   }
@@ -160,79 +180,163 @@ function login() {
   const user = accounts[username];
 
   if (!user || user.password !== password) {
-    return message("authMessage", "Login yoki parol noto'g'ri.");
+    message("authMessage", "Login yoki parol noto‘g‘ri.");
+    return;
   }
 
   repairPlayer(user);
   saveCurrentUser(user);
-  saveSession({ username });
-  message("authMessage", "");
+  saveSession({ username: username });
+
   initialize();
 }
 
-// ===== AKKAUNTDAN CHIQISH =====
+// ---------- CHIQISH ----------
 function logout() {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(TEMP_SESSION_KEY);
   initialize();
 }
 
-// ===== BO'LIMLAR =====
+// ---------- BO‘LIMLAR ----------
 function showTab(id) {
-  document.querySelectorAll(".tab").forEach(tab => {
+  document.querySelectorAll(".tab").forEach(function(tab) {
     tab.hidden = tab.id !== id;
   });
 }
 
-// ===== BALANS =====
+// ---------- BALANS ----------
 function updateBalance() {
+  const user = currentUser();
   const balance = document.getElementById("balance");
+
   if (!balance) return;
 
-  const user = currentUser();
-
-  balance.textContent = user
-    ? user.coins.toLocaleString("ru-RU")
-    : STARTING_COINS.toLocaleString("ru-RU");
+  balance.textContent = formatCoins(
+    user ? user.coins : STARTING_COINS
+  );
 }
 
-// ===== RAQAM YARATISH =====
+// ---------- O‘ZBEKISTON AVTOMOBIL RAQAMLARI ----------
 function randomPlate() {
   const letters = "ABCEHKMOPTXY";
+  const regions = [
+    "01", "10", "20", "25", "30", "40", "50",
+    "60", "70", "75", "80", "85", "90", "95"
+  ];
 
-  const letter = () =>
-    letters[Math.floor(Math.random() * letters.length)];
+  function randomLetter() {
+    return letters[Math.floor(Math.random() * letters.length)];
+  }
 
-  const digit = () => Math.floor(Math.random() * 10);
+  function randomDigit() {
+    return Math.floor(Math.random() * 10);
+  }
 
-  return `${letter()}${digit()}${digit()}${digit()}${letter()}${letter()}`;
+  const region = regions[Math.floor(Math.random() * regions.length)];
+  const firstLetter = randomLetter();
+  const digits = `${randomDigit()}${randomDigit()}${randomDigit()}`;
+  const lastLetters = `${randomLetter()}${randomLetter()}`;
+
+  return `${region} ${firstLetter} ${digits} ${lastLetters}`;
 }
 
-// ===== RAQAM AYLANTRISH =====
+// ---------- RAQAM VA NARX YARATISH ----------
+function generatePlateOffer() {
+  const letters = "ABCEHKMOPTXY";
+  const regions = [
+    "01", "10", "20", "25", "30", "40", "50",
+    "60", "70", "75", "80", "85", "90", "95"
+  ];
+
+  function randomLetter() {
+    return letters[Math.floor(Math.random() * letters.length)];
+  }
+
+  function randomDigit() {
+    return Math.floor(Math.random() * 10);
+  }
+
+  const region = regions[Math.floor(Math.random() * regions.length)];
+  const firstLetter = randomLetter();
+
+  // Eng qimmat raqamlar: 777 yoki oxirgi ikkita harf bir xil.
+  const elite = Math.random() < 0.025;
+
+  let digits;
+  let lastLetters;
+
+  if (elite && Math.random() < 0.5) {
+    digits = "777";
+
+    const sameLetter = randomLetter();
+    lastLetters = sameLetter + sameLetter;
+  } else if (elite) {
+    digits = `${randomDigit()}${randomDigit()}${randomDigit()}`;
+
+    const sameLetter = randomLetter();
+    lastLetters = sameLetter + sameLetter;
+  } else {
+    digits = `${randomDigit()}${randomDigit()}${randomDigit()}`;
+    lastLetters = `${randomLetter()}${randomLetter()}`;
+  }
+
+  const plate = `${region} ${firstLetter} ${digits} ${lastLetters}`;
+
+  const isElite =
+    digits === "777" ||
+    lastLetters[0] === lastLetters[1];
+
+  const repeatedDigits =
+    digits[0] === digits[1] ||
+    digits[1] === digits[2] ||
+    digits === "123" ||
+    digits === "321";
+
+  let price;
+  let rarity;
+
+  if (isElite) {
+    price = 10000000;
+    rarity = "УЛЬТРА";
+  } else if (repeatedDigits) {
+    price = 200000 + Math.floor(Math.random() * 800001);
+    rarity = "РЕДКИЙ";
+  } else {
+    price = 20000 + Math.floor(Math.random() * 480001);
+    rarity = "ОБЫЧНЫЙ";
+  }
+
+  return {
+    plate: plate,
+    price: price,
+    rarity: rarity
+  };
+}
+
+// ---------- RAQAM AYLANTIRISH ----------
 function spinNumber() {
   const user = currentUser();
-  if (!user) return;
+
+  if (!user) {
+    message("spinResult", "Avval akkauntingizga kiring.");
+    return;
+  }
 
   if (user.coins < SPIN_PRICE) {
-    return message("spinResult", "Tangalar yetarli emas!");
+    message("spinResult", "Tangalar yetarli emas!");
+    return;
   }
 
   user.coins -= SPIN_PRICE;
 
-  const rare = Math.random() < 0.10;
-  const plate = rare
-    ? "777" + randomPlate().slice(3)
-    : randomPlate();
-
-  const price = rare
-    ? 20000 + Math.floor(Math.random() * 80001)
-    : 10000 + Math.floor(Math.random() * 40001);
+  const offer = generatePlateOffer();
 
   const number = {
     id: Date.now() + Math.random(),
-    plate,
-    price,
-    rarity: rare ? "Редкий" : "Обычный",
+    plate: offer.plate,
+    price: offer.price,
+    rarity: offer.rarity,
     date: new Date().toLocaleString()
   };
 
@@ -242,52 +346,86 @@ function spinNumber() {
   saveCurrentUser(user);
 
   const display = document.getElementById("spinDisplay");
-  if (display) display.textContent = plate;
+
+  if (display) {
+    display.textContent = number.plate;
+    display.classList.add("uzbek-plate");
+    display.setAttribute(
+      "aria-label",
+      "O‘zbekiston avtomobil raqami " + number.plate
+    );
+  }
 
   message(
     "spinResult",
-    `${number.rarity}! Narxi: ${price.toLocaleString()} 🪙`
+    number.rarity + "! Narxi: " + formatCoins(number.price) + " 🪙"
   );
 
   updateBalance();
   renderGame();
 }
 
-// ===== PROMOKOD =====
+// ---------- PROMOKOD ISHLATISH ----------
 function usePromo() {
   const user = currentUser();
-  if (!user) return;
 
-  const code = document
-    .getElementById("promoInput")
-    .value.trim()
-    .toUpperCase();
+  if (!user) {
+    message("promoMessage", "Avval akkauntingizga kiring.");
+    return;
+  }
 
-  const promo = getPromos()[code];
+  const input = document.getElementById("promoInput");
+
+  if (!input) {
+    message("promoMessage", "Promokod maydoni topilmadi.");
+    return;
+  }
+
+  const code = input.value.trim().toUpperCase();
+  const promos = getPromos();
+  const promo = promos[code];
 
   if (!promo) {
-    return message("promoMessage", "Promokod topilmadi.");
+    message("promoMessage", "Promokod topilmadi.");
+    return;
   }
 
   if (user.usedPromos.includes(code)) {
-    return message("promoMessage", "Bu promokod oldin ishlatilgan.");
+    message("promoMessage", "Bu promokod oldin ishlatilgan.");
+    return;
   }
 
-  user.coins += Number(promo.amount);
+  const amount = Number(promo.amount);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    message("promoMessage", "Promokod mukofoti noto‘g‘ri.");
+    return;
+  }
+
+  user.coins += amount;
   user.usedPromos.push(code);
 
   saveCurrentUser(user);
   updateBalance();
 
-  message("promoMessage", `${promo.amount} tanga qo'shildi!`);
+  message(
+    "promoMessage",
+    formatCoins(amount) + " tanga qo‘shildi!"
+  );
 }
 
-// ===== ADMIN: TANGA BERISH =====
+// ---------- ADMIN: TANGA BERISH ----------
 function giveCoins() {
-  if (!currentSession()?.admin) return;
+  const playerInput = document.getElementById("adminPlayer");
+  const amountInput = document.getElementById("adminCoins");
 
-  const username = document.getElementById("adminPlayer").value.trim();
-  const amount = Number(document.getElementById("adminCoins").value);
+  if (!playerInput || !amountInput) {
+    message("adminMessage", "Admin formasi HTML ichida topilmadi.");
+    return;
+  }
+
+  const username = playerInput.value.trim();
+  const amount = Number(amountInput.value);
   const accounts = getAccounts();
 
   if (
@@ -295,7 +433,8 @@ function giveCoins() {
     !Number.isFinite(amount) ||
     amount <= 0
   ) {
-    return message("adminMessage", "Login yoki miqdorni tekshiring.");
+    message("adminMessage", "Login yoki tanga miqdorini tekshiring.");
+    return;
   }
 
   accounts[username].coins += Math.floor(amount);
@@ -305,54 +444,67 @@ function giveCoins() {
   renderAdmin();
 }
 
-// ===== ADMIN: PROMOKOD YARATISH =====
+// ---------- ADMIN: PROMOKOD YARATISH ----------
 function createPromo() {
-  if (!currentSession()?.admin) return;
+  const codeInput = document.getElementById("newPromo");
+  const amountInput = document.getElementById("newPromoAmount");
 
-  const code = document
-    .getElementById("newPromo")
-    .value.trim()
-    .toUpperCase();
+  if (!codeInput || !amountInput) {
+    message("adminMessage", "Promokod formasi topilmadi.");
+    return;
+  }
 
-  const amount = Number(
-    document.getElementById("newPromoAmount").value
-  );
+  const code = codeInput.value.trim().toUpperCase();
+  const amount = Number(amountInput.value);
 
   if (
     !/^[A-Z0-9_-]{3,20}$/.test(code) ||
     !Number.isFinite(amount) ||
     amount <= 0
   ) {
-    return message("adminMessage", "Promokod yoki mukofot noto'g'ri.");
+    message("adminMessage", "Promokod yoki mukofot miqdori noto‘g‘ri.");
+    return;
   }
 
   const promos = getPromos();
 
   if (promos[code]) {
-    return message("adminMessage", "Bu promokod allaqachon mavjud.");
+    message("adminMessage", "Bu promokod allaqachon mavjud.");
+    return;
   }
 
-  promos[code] = { amount: Math.floor(amount) };
+  promos[code] = {
+    amount: Math.floor(amount)
+  };
+
   savePromos(promos);
 
   message("adminMessage", "Promokod yaratildi!");
   renderAdmin();
 }
 
-// ===== MASHINA SOTIB OLISH =====
+// ---------- MASHINA SOTIB OLISH ----------
 function buyCar(id) {
   const user = currentUser();
+
   if (!user) return;
 
-  const car = STARTER_CARS.find(item => item.id === id);
+  const car = STARTER_CARS.find(function(item) {
+    return item.id === id;
+  });
+
   if (!car) return;
 
-  if (user.cars.some(item => item.id === id)) {
-    return alert("Bu mashina garajingda bor.");
+  if (user.cars.some(function(item) {
+    return item.id === id;
+  })) {
+    alert("Bu mashina garajingizda bor.");
+    return;
   }
 
   if (user.coins < car.price) {
-    return alert("Tangalar yetarli emas.");
+    alert("Tangalar yetarli emas.");
+    return;
   }
 
   user.coins -= car.price;
@@ -363,23 +515,42 @@ function buyCar(id) {
   renderGame();
 }
 
-// ===== RAQAMNI SOTISH =====
-function sellNumber(id) {
+// ---------- RAQAM SOTIB OLISH ----------
+function buyNumber(id) {
   const user = currentUser();
+
   if (!user) return;
 
-  const index = user.numbers.findIndex(item => item.id === id);
+  const number = user.numbers.find(function(item) {
+    return item.id === id;
+  });
+
+  if (!number) return;
+
+  alert("Bu raqam allaqachon sizning garajingizda.");
+}
+
+// ---------- RAQAMNI SOTISH ----------
+function sellNumber(id) {
+  const user = currentUser();
+
+  if (!user) return;
+
+  const index = user.numbers.findIndex(function(item) {
+    return item.id === id;
+  });
+
   if (index === -1) return;
 
   const number = user.numbers[index];
 
-  if (
-    !confirm(
-      `${number.plate} raqamini ${number.price.toLocaleString()} tangaga sotasanmi?`
-    )
-  ) {
-    return;
-  }
+  const confirmed = confirm(
+    number.plate + " raqamini " +
+    formatCoins(number.price) +
+    " tangaga sotmoqchimisiz?"
+  );
+
+  if (!confirmed) return;
 
   user.coins += number.price;
   user.numbers.splice(index, 1);
@@ -389,24 +560,28 @@ function sellNumber(id) {
   renderGame();
 }
 
-// ===== MASHINANI SOTISH =====
+// ---------- MASHINANI SOTISH ----------
 function sellCar(id) {
   const user = currentUser();
+
   if (!user) return;
 
-  const index = user.cars.findIndex(car => car.id === id);
+  const index = user.cars.findIndex(function(car) {
+    return car.id === id;
+  });
+
   if (index === -1) return;
 
   const car = user.cars[index];
   const refund = Math.floor(car.price * 0.7);
 
-  if (
-    !confirm(
-      `${car.name} mashinasini ${refund.toLocaleString()} tangaga sotasanmi?`
-    )
-  ) {
-    return;
-  }
+  const confirmed = confirm(
+    car.name + " mashinasini " +
+    formatCoins(refund) +
+    " tangaga sotmoqchimisiz?"
+  );
+
+  if (!confirmed) return;
 
   user.coins += refund;
   user.cars.splice(index, 1);
@@ -416,39 +591,50 @@ function sellCar(id) {
   renderGame();
 }
 
-// ===== ADMIN PANEL =====
+// ---------- ADMIN PANEL ----------
 function renderAdmin() {
-  if (!currentSession()?.admin) return;
-
   const players = document.getElementById("playersList");
   const promoList = document.getElementById("promoList");
 
-  if (!players || !promoList) return;
+  if (players) {
+    players.replaceChildren();
 
-  players.replaceChildren();
-  promoList.replaceChildren();
+    Object.values(getAccounts()).forEach(function(user) {
+      const row = document.createElement("p");
+      row.textContent =
+        user.username + " — " + formatCoins(user.coins) + " 🪙";
 
-  Object.values(getAccounts()).forEach(user => {
-    const row = document.createElement("p");
-    row.textContent =
-      `${user.username} — ${user.coins.toLocaleString()} 🪙`;
-    players.appendChild(row);
-  });
+      players.appendChild(row);
+    });
+  }
 
-  Object.entries(getPromos()).forEach(([code, promo]) => {
-    const row = document.createElement("p");
-    row.textContent = `${code} — ${promo.amount} 🪙`;
-    promoList.appendChild(row);
-  });
+  if (promoList) {
+    promoList.replaceChildren();
+
+    Object.entries(getPromos()).forEach(function(entry) {
+      const code = entry[0];
+      const promo = entry[1];
+
+      const row = document.createElement("p");
+      row.textContent =
+        code + " — " + formatCoins(promo.amount) + " 🪙";
+
+      promoList.appendChild(row);
+    });
+  }
 }
 
-// ===== O'YINNI EKRANGA CHIQARISH =====
+// ---------- O‘YINNI CHIZISH ----------
 function renderGame() {
   const user = currentUser();
+
   if (!user) return;
 
   const playerName = document.getElementById("playerName");
-  if (playerName) playerName.textContent = user.username;
+
+  if (playerName) {
+    playerName.textContent = user.username;
+  }
 
   const carShop = document.getElementById("carShop");
   const numberShop = document.getElementById("numberShop");
@@ -456,92 +642,114 @@ function renderGame() {
   const myNumbers = document.getElementById("myNumbers");
   const historyList = document.getElementById("historyList");
 
-  if (!carShop || !numberShop || !garageCars || !myNumbers || !historyList) {
-    return;
+  // Mashinalar katalogi
+  if (carShop) {
+    carShop.replaceChildren();
+
+    STARTER_CARS.forEach(function(car) {
+      const card = document.createElement("div");
+      card.className = "item";
+
+      const title = document.createElement("h3");
+      title.textContent = car.name;
+
+      const price = document.createElement("p");
+      price.textContent = formatCoins(car.price) + " 🪙";
+
+      const button = document.createElement("button");
+      button.textContent = "Sotib olish";
+      button.onclick = function() {
+        buyCar(car.id);
+      };
+
+      card.append(title, price, button);
+      carShop.appendChild(card);
+    });
   }
 
-  // Mashina do'koni
-  carShop.replaceChildren();
+  // Raqamlar katalogi
+  if (numberShop) {
+    numberShop.replaceChildren();
 
-  STARTER_CARS.forEach(car => {
-    const card = document.createElement("div");
-    card.className = "item";
+    const text = document.createElement("p");
+    text.textContent =
+      "Raqam olish uchun Prokrutka bo‘limiga kiring.";
 
-    const title = document.createElement("h3");
-    title.textContent = car.name;
-
-    const price = document.createElement("p");
-    price.textContent = `${car.price.toLocaleString()} 🪙`;
-
-    const button = document.createElement("button");
-    button.textContent = "Sotib olish";
-    button.onclick = () => buyCar(car.id);
-
-    card.append(title, price, button);
-    carShop.appendChild(card);
-  });
-
-  numberShop.innerHTML =
-    "<p>Raqam olish uchun «Prokrutka» bo'limiga kir.</p>";
+    numberShop.appendChild(text);
+  }
 
   // Garajdagi mashinalar
-  garageCars.replaceChildren();
+  if (garageCars) {
+    garageCars.replaceChildren();
 
-  user.cars.forEach(car => {
-    const card = document.createElement("div");
-    card.className = "item";
+    user.cars.forEach(function(car) {
+      const card = document.createElement("div");
+      card.className = "item";
 
-    const title = document.createElement("h3");
-    title.textContent = car.name;
+      const title = document.createElement("h3");
+      title.textContent = car.name;
 
-    const price = document.createElement("p");
-    price.textContent =
-      `Xarid narxi: ${car.price.toLocaleString()} 🪙`;
+      const price = document.createElement("p");
+      price.textContent =
+        "Xarid narxi: " + formatCoins(car.price) + " 🪙";
 
-    const button = document.createElement("button");
-    button.textContent = "Mashina sotish (70%)";
-    button.onclick = () => sellCar(car.id);
+      const button = document.createElement("button");
+      button.textContent = "Mashina sotish (70%)";
+      button.onclick = function() {
+        sellCar(car.id);
+      };
 
-    card.append(title, price, button);
-    garageCars.appendChild(card);
-  });
+      card.append(title, price, button);
+      garageCars.appendChild(card);
+    });
+  }
 
-  // Garajdagi raqamlar
-  myNumbers.replaceChildren();
+  // Olingan raqamlar
+  if (myNumbers) {
+    myNumbers.replaceChildren();
 
-  user.numbers.forEach(number => {
-    const card = document.createElement("div");
-    card.className = "item";
+    user.numbers.forEach(function(number) {
+      const card = document.createElement("div");
+      card.className = "item";
 
-    const title = document.createElement("h3");
-    title.textContent = number.plate;
+      const title = document.createElement("h3");
+      title.textContent = number.plate;
 
-    const price = document.createElement("p");
-    price.textContent =
-      `${number.rarity} — ${number.price.toLocaleString()} 🪙`;
+      const price = document.createElement("p");
+      price.textContent =
+        number.rarity + " — " +
+        formatCoins(number.price) + " 🪙";
 
-    const button = document.createElement("button");
-    button.textContent = "Raqamni sotish";
-    button.onclick = () => sellNumber(number.id);
+      const button = document.createElement("button");
+      button.textContent = "Raqamni sotish";
+      button.onclick = function() {
+        sellNumber(number.id);
+      };
 
-    card.append(title, price, button);
-    myNumbers.appendChild(card);
-  });
+      card.append(title, price, button);
+      myNumbers.appendChild(card);
+    });
+  }
 
   // Raqamlar tarixi
-  historyList.replaceChildren();
+  if (historyList) {
+    historyList.replaceChildren();
 
-  user.history.forEach(item => {
-    const row = document.createElement("p");
-    row.textContent =
-      `${item.plate} — ${item.rarity} — ` +
-      `${item.price.toLocaleString()} 🪙 — ${item.date}`;
+    user.history.forEach(function(item) {
+      const row = document.createElement("p");
 
-    historyList.appendChild(row);
-  });
+      row.textContent =
+        item.plate + " — " +
+        item.rarity + " — " +
+        formatCoins(item.price) + " 🪙 — " +
+        item.date;
+
+      historyList.appendChild(row);
+    });
+  }
 }
 
-// ===== SAYTNI ISHGA TUSHIRISH =====
+// ---------- SAYTNI ISHGA TUSHIRISH ----------
 function initialize() {
   const session = currentSession();
 
@@ -549,15 +757,18 @@ function initialize() {
   const gamePanel = document.getElementById("gamePanel");
   const adminNav = document.getElementById("adminNav");
 
-  if (!authPanel || !gamePanel || !adminNav) {
-    console.error("HTML ichida authPanel, gamePanel yoki adminNav topilmadi.");
+  if (!authPanel || !gamePanel) {
+    console.error(
+      "NOMER X: HTML ichida #authPanel yoki #gamePanel topilmadi."
+    );
     return;
   }
 
   if (!session) {
     authPanel.hidden = false;
     gamePanel.hidden = true;
-    adminNav.hidden = true;
+
+    if (adminNav) adminNav.hidden = true;
 
     updateBalance();
     return;
@@ -566,10 +777,14 @@ function initialize() {
   if (session.admin) {
     authPanel.hidden = true;
     gamePanel.hidden = false;
-    adminNav.hidden = false;
+
+    if (adminNav) adminNav.hidden = false;
 
     const playerName = document.getElementById("playerName");
-    if (playerName) playerName.textContent = "Admin";
+
+    if (playerName) {
+      playerName.textContent = "Admin";
+    }
 
     showTab("adminTab");
     renderAdmin();
@@ -588,12 +803,13 @@ function initialize() {
 
   authPanel.hidden = true;
   gamePanel.hidden = false;
-  adminNav.hidden = true;
+
+  if (adminNav) adminNav.hidden = true;
 
   updateBalance();
   renderGame();
   showTab("spinTab");
 }
 
-// ===== BOSHLASH =====
+// Sahifa ochilganda ishga tushadi
 initialize();

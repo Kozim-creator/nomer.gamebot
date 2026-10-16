@@ -370,3 +370,21 @@ footer span {
     letter-spacing: 2px;
   }
 }
+/* O'zbekiston avtomobil raqami ko'rinishi */
+#spinDisplay.uzbek-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  padding: 12px 18px;
+  background: #fff;
+  color: #111;
+  border: 3px solid #222;
+  border-radius: 8px;
+  font-family: Arial, sans-serif;
+  font-size: clamp(22px, 5vw, 38px);
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-align: center;
+  box-shadow: 0 5px 15px #0003;
+}

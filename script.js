@@ -244,10 +244,72 @@ function randomPlate() {
 // ---------- RAQAM VA NARX YARATISH ----------
 function generatePlateOffer() {
   const letters = "ABCEHKMOPTXY";
+
+  const regionSelect = document.getElementById("regionSelect");
   const regions = [
     "01", "10", "20", "25", "30", "40", "50",
     "60", "70", "75", "80", "85", "90", "95"
   ];
+
+  const region = regionSelect && regions.includes(regionSelect.value)
+    ? regionSelect.value
+    : "01";
+
+  function randomLetter() {
+    return letters[Math.floor(Math.random() * letters.length)];
+  }
+
+  function randomDigit() {
+    return Math.floor(Math.random() * 10);
+  }
+
+  const firstLetter = randomLetter();
+  const elite = Math.random() < 0.025;
+
+  let digits;
+  let lastLetters;
+
+  if (elite && Math.random() < 0.5) {
+    digits = "777";
+    const letter = randomLetter();
+    lastLetters = letter + letter;
+  } else if (elite) {
+    digits = `${randomDigit()}${randomDigit()}${randomDigit()}`;
+    const letter = randomLetter();
+    lastLetters = letter + letter;
+  } else {
+    digits = `${randomDigit()}${randomDigit()}${randomDigit()}`;
+    lastLetters = `${randomLetter()}${randomLetter()}`;
+  }
+
+  const plate = `${region} ${firstLetter} ${digits} ${lastLetters}`;
+
+  const isElite =
+    digits === "777" ||
+    lastLetters[0] === lastLetters[1];
+
+  const repeatedDigits =
+    digits[0] === digits[1] ||
+    digits[1] === digits[2] ||
+    digits === "123" ||
+    digits === "321";
+
+  let price;
+  let rarity;
+
+  if (isElite) {
+    price = 10000000;
+    rarity = "УЛЬТРА";
+  } else if (repeatedDigits) {
+    price = 200000 + Math.floor(Math.random() * 800001);
+    rarity = "РЕДКИЙ";
+  } else {
+    price = 20000 + Math.floor(Math.random() * 480001);
+    rarity = "ОБЫЧНЫЙ";
+  }
+
+  return { plate, price, rarity };
+}
 
   function randomLetter() {
     return letters[Math.floor(Math.random() * letters.length)];
@@ -312,7 +374,7 @@ function generatePlateOffer() {
     price: price,
     rarity: rarity
   };
-}
+
 
 // ---------- RAQAM AYLANTIRISH ----------
 function spinNumber() {

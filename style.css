@@ -388,3 +388,44 @@ footer span {
   text-align: center;
   box-shadow: 0 5px 15px #0003;
 }
+/* O‘zbekiston nomeri */
+#spinDisplay.uzbek-plate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 70px;
+    padding: 12px 18px;
+
+    background: linear-gradient(to bottom, #ffffff, #eeeeee);
+    color: #111111;
+
+    border: 3px solid #222222;
+    border-radius: 8px;
+
+    font-family: Arial, sans-serif;
+    font-size: clamp(22px, 5vw, 38px);
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-align: center;
+
+    box-shadow: 0 5px 15px #0004;
+}
+
+/* Oddiy raqam */
+#spinDisplay.uzbek-plate.ordinary {
+    border-color: #888888;
+}
+
+/* Rare raqam */
+#spinDisplay.uzbek-plate.rare {
+    border-color: #1687ff;
+    box-shadow: 0 0 12px #1687ff88;
+}
+
+/* Ultra raqam */
+#spinDisplay.uzbek-plate.ultra {
+    border-color: #ffb700;
+    box-shadow: 0 0 20px #ffb700aa;
+    color: #9b6500;
+}

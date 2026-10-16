@@ -1,75 +1,37 @@
 
-const STORAGE_KEY = "nomer_x_accounts_v5";
-const SESSION_KEY = "nomer_x_session_v5";
-const PROMO_KEY = "nomer_x_promos_v5";
-const SPIN_PRICE = 1000;
+"use strict";
 
+const STARTING_COINS = 50000;
+const SPIN_PRICE = 1000;
 const ADMIN_LOGIN = "kozim_admin";
-const ADMIN_PASSWORD = "Kozim_Change_927!";
+const ADMIN_PASSWORD = "Kozim_creator";
+
+const ACCOUNTS_KEY = "nomer_x_accounts_v5";
+const SESSION_KEY = "nomer_x_session_v5";
+const TEMP_SESSION_KEY = "nomer_x_temporary_session";
+const PROMO_KEY = "nomer_x_promos_v5";
 
 const STARTER_CARS = [
-  { id: "starter_bmw", name: "BMW M4", price: 0, emoji: "🏎️", installedPlate: null },
-  { id: "starter_g63", name: "Mercedes G63", price: 0, emoji: "🚙", installedPlate: null }
+  { id: "bmw_m4", name: "BMW M4", price: 25000 },
+  { id: "mercedes_amg", name: "Mercedes AMG", price: 40000 },
+  { id: "lamborghini", name: "Lamborghini", price: 100000 }
 ];
-
-const cars = [
-  { id: "bmw", name: "BMW M4", price: 20000, emoji: "🏎️" },
-  { id: "mercedes", name: "Mercedes-AMG", price: 30000, emoji: "🚘" },
-  { id: "lambo", name: "Lamborghini", price: 50000, emoji: "🏎️" },
-  { id: "bugatti", name: "Bugatti Chiron", price: 100000, emoji: "🚀" },
-  { id: "g63", name: "Mercedes G63", price: 40000, emoji: "🚙" },
-  { id: "supra", name: "Toyota Supra", price: 25000, emoji: "🏁" },
-  { id: "porsche", name: "Porsche 911", price: 60000, emoji: "🏎️" },
-  { id: "audi", name: "Audi RS7", price: 45000, emoji: "🚘" },
-  { id: "mclaren", name: "McLaren 720S", price: 90000, emoji: "🏎️" },
-  { id: "rolls", name: "Rolls-Royce", price: 120000, emoji: "🚘" }
-];
-
-const numberOffers = [
-  { plate: "A777AA", rarity: "Редкий", price: 1500000 },
-  { plate: "M555MM", rarity: "Редкий", price: 800000 },
-  { plate: "B123BC", rarity: "Обычный", price: 85000 },
-  { plate: "X000XX", rarity: "Редкий", price: 2500000 },
-  { plate: "V111VV", rarity: "Редкий", price: 1200000 },
-  { plate: "C404CC", rarity: "Обычный", price: 65000 },
-  { plate: "D777DD", rarity: "Редкий", price: 1800000 },
-  { plate: "T123TT", rarity: "Обычный", price: 90000 }
-];
-
-// ---------- STORAGE ----------
 
 function readJSON(key, fallback) {
   try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
   } catch {
     return fallback;
   }
 }
 
 function getAccounts() {
-  let accounts = readJSON(STORAGE_KEY, null);
-
-  if (!accounts) {
-    for (const oldKey of [
-      "nomer_x_accounts_v4",
-      "nomer_x_accounts_v3",
-      "nomer_x_accounts"
-    ]) {
-      const oldData = readJSON(oldKey, null);
-
-      if (oldData && typeof oldData === "object") {
-        accounts = oldData;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
-        break;
-      }
-    }
-  }
-
-  return accounts || {};
+  return readJSON(ACCOUNTS_KEY, {});
 }
 
 function saveAccounts(accounts) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
 function getPromos() {
@@ -81,7 +43,20 @@ function savePromos(promos) {
 }
 
 function currentSession() {
-  return readJSON(SESSION_KEY, null);
+  return readJSON(SESSION_KEY, null) ||
+    readJSON(TEMP_SESSION_KEY, null);
+}
+
+function saveSession(session) {
+  const remember = document.getElementById("rememberMe").checked;
+
+  if (remember) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    sessionStorage.removeItem(TEMP_SESSION_KEY);
+  } else {
+    sessionStorage.setItem(TEMP_SESSION_KEY, JSON.stringify(session));
+    localStorage.removeItem(SESSION_KEY);
+  }
 }
 
 function currentUser() {
@@ -96,113 +71,52 @@ function saveCurrentUser(user) {
   saveAccounts(accounts);
 }
 
-function setMessage(id, message) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = message;
-}
-
-function escapeHTML(value) {
-  return String(value).replace(/[&<>"']/g, ch => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  })[ch]);
-}
-
-// ---------- ВОССТАНОВЛЕНИЕ СТАРТОВОГО НАБОРА ----------
-
 function repairPlayer(user) {
-  let changed = false;
-
-  if (!Array.isArray(user.numbers)) {
-    user.numbers = [];
-    changed = true;
-  }
-
-  if (!Array.isArray(user.cars)) {
-    user.cars = [];
-    changed = true;
-  }
-
-  if (!Array.isArray(user.history)) {
-    user.history = [];
-    changed = true;
-  }
-
-  if (!Array.isArray(user.usedPromos)) {
-    user.usedPromos = [];
-    changed = true;
-  }
-
-  if (!Number.isFinite(Number(user.coins))) {
-    user.coins = 0;
-    changed = true;
-  }
-
-  if (!user.starterPackApplied) {
-    user.coins += 50000;
-
-    for (const starter of STARTER_CARS) {
-      const exists = user.cars.some(car =>
-        car.id === starter.id ||
-        (car.name === starter.name && Number(car.price) === 0)
-      );
-
-      if (!exists) user.cars.push({ ...starter });
-    }
-
-    user.starterPackApplied = true;
-    changed = true;
-  }
-
-  if (changed) saveCurrentUser(user);
+  if (typeof user.coins !== "number") user.coins = STARTING_COINS;
+  if (!Array.isArray(user.cars)) user.cars = [];
+  if (!Array.isArray(user.numbers)) user.numbers = [];
+  if (!Array.isArray(user.history)) user.history = [];
+  if (!Array.isArray(user.usedPromos)) user.usedPromos = [];
   return user;
 }
 
-// ---------- REGISTRATION ----------
+function message(id, text) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = text;
+}
 
 function register() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value;
 
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-    setMessage("authMessage", "Логин: 3–20 латинских букв, цифр или _.");
-    return;
-  }
-
-  if (password.length < 4) {
-    setMessage("authMessage", "Пароль должен быть минимум 4 символа.");
-    return;
+  if (username.length < 3 || password.length < 4) {
+    return message("authMessage", "Login kamida 3, parol 4 ta belgidan iborat bo‘lsin.");
   }
 
   if (username.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
-    setMessage("authMessage", "Этот логин зарезервирован.");
-    return;
+    return message("authMessage", "Bu login band.");
   }
 
   const accounts = getAccounts();
 
   if (accounts[username]) {
-    setMessage("authMessage", "Этот логин уже занят.");
-    return;
+    return message("authMessage", "Bu login mavjud.");
   }
 
-  accounts[username] = {
+  const user = {
     username,
     password,
-    coins: 50000,
+    coins: STARTING_COINS,
+    cars: [],
     numbers: [],
-    cars: STARTER_CARS.map(car => ({ ...car })),
     history: [],
-    usedPromos: [],
-    starterPackApplied: true
+    usedPromos: []
   };
 
+  accounts[username] = user;
   saveAccounts(accounts);
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
-  enterGame();
+  saveSession({ username });
+  initialize();
 }
 
 function login() {
@@ -210,414 +124,83 @@ function login() {
   const password = document.getElementById("password").value;
 
   if (username === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
-    localStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify({ username: ADMIN_LOGIN, admin: true })
-    );
-    showAdminLogin();
+    saveSession({ username: ADMIN_LOGIN, admin: true });
+    initialize();
     return;
   }
 
-  const user = getAccounts()[username];
+  const accounts = getAccounts();
+  const user = accounts[username];
 
   if (!user || user.password !== password) {
-    setMessage("authMessage", "Неверный логин или пароль.");
-    return;
+    return message("authMessage", "Login yoki parol noto‘g‘ri.");
   }
 
   repairPlayer(user);
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
-  enterGame();
+  saveCurrentUser(user);
+  saveSession({ username });
+  initialize();
 }
 
 function logout() {
   localStorage.removeItem(SESSION_KEY);
-  document.getElementById("authPanel").hidden = false;
-  document.getElementById("gamePanel").hidden = true;
-  document.getElementById("adminNav").hidden = true;
-  setMessage("authMessage", "");
+  sessionStorage.removeItem(TEMP_SESSION_KEY);
+  initialize();
 }
 
-function isAdmin() {
-  const session = currentSession();
-
-  return Boolean(
-    session &&
-    session.admin === true &&
-    session.username === ADMIN_LOGIN
-  );
-}
-
-function showAdminLogin() {
-  document.getElementById("authPanel").hidden = true;
-  document.getElementById("gamePanel").hidden = false;
-  document.getElementById("adminNav").hidden = false;
-  document.getElementById("playerName").textContent = "ADMIN";
-
-  showTab("adminTab");
-  updateBalance();
-  renderAdmin();
-}
-
-function enterGame() {
-  let user = currentUser();
-
-  if (!user) {
-    logout();
-    return;
-  }
-
-  user = repairPlayer(user);
-
-  document.getElementById("authPanel").hidden = true;
-  document.getElementById("gamePanel").hidden = false;
-  document.getElementById("playerName").textContent = user.username;
-  document.getElementById("adminNav").hidden = true;
-
-  showTab("spinTab");
-  updateBalance();
-  renderAll();
-}
-
-// ---------- NAVIGATION ----------
-
-function showTab(tabId) {
-  if (tabId === "adminTab" && !isAdmin()) return;
-
+function showTab(id) {
   document.querySelectorAll(".tab").forEach(tab => {
-    tab.hidden = tab.id !== tabId;
+    tab.hidden = tab.id !== id;
   });
-
-  if (tabId === "shopTab") renderShop();
-  if (tabId === "garageTab") renderGarage();
-  if (tabId === "historyTab") renderHistory();
-  if (tabId === "adminTab") renderAdmin();
 }
 
 function updateBalance() {
-  const el = document.getElementById("balance");
   const user = currentUser();
-
-  if (el) {
-    el.textContent = user
-      ? Number(user.coins).toLocaleString("ru-RU")
-      : "—";
-  }
+  document.getElementById("balance").textContent =
+    user ? user.coins.toLocaleString("ru-RU") : STARTING_COINS.toLocaleString("ru-RU");
 }
 
-// ---------- NUMBER GENERATION ----------
-
-// Формат: V000VV, A527BC, M777MM.
 function randomPlate() {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const letters = "ABCEHKMOPTXY";
   const letter = () => letters[Math.floor(Math.random() * letters.length)];
   const digit = () => Math.floor(Math.random() * 10);
-
   return `${letter()}${digit()}${digit()}${digit()}${letter()}${letter()}`;
 }
-
-function getBeautyScore(plate) {
-  const digits = plate.slice(1, 4);
-  const letters = plate[0] + plate.slice(4, 6);
-  let score = 0;
-
-  if (digits[0] === digits[1] && digits[1] === digits[2]) score += 5;
-  if (digits[0] === digits[2]) score += 2;
-  if (new Set(digits).size === 1) score += 3;
-
-  if (letters[0] === letters[1] && letters[1] === letters[2]) score += 5;
-  if (new Set(letters).size === 1) score += 2;
-
-  if (["000", "111", "222", "333", "555", "777", "888", "999"].includes(digits)) {
-    score += 2;
-  }
-
-  return Math.min(score, 10);
-}
-
-function getNumberPrice(plate, rarity) {
-  const score = getBeautyScore(plate);
-  const random = Math.random();
-
-  const min = rarity === "Редкий" ? 20000 : 10000;
-  const max = rarity === "Редкий" ? 30000000 : 500000;
-
-  // Красивые номера получают заметную прибавку к цене.
-  const price = min
-    + random * (max - min) * 0.5
-    + (score / 10) * (max - min) * 0.5;
-
-  return Math.floor(Math.min(max, Math.max(min, price)));
-}
-
-// ---------- SPIN ----------
 
 function spinNumber() {
   const user = currentUser();
   if (!user) return;
 
   if (user.coins < SPIN_PRICE) {
-    setMessage("spinResult", "Недостаточно монет! Нужно 1 000.");
-    return;
+    return message("spinResult", "Tangalar yetarli emas!");
   }
 
   user.coins -= SPIN_PRICE;
-  saveCurrentUser(user);
-  updateBalance();
 
-  const button = document.getElementById("spinButton");
-  const display = document.getElementById("spinDisplay");
+  const rare = Math.random() < 0.10;
+  const plate = rare ? "777" + randomPlate().slice(3) : randomPlate();
+  const price = rare
+    ? 20000 + Math.floor(Math.random() * 80001)
+    : 10000 + Math.floor(Math.random() * 40001);
 
-  button.disabled = true;
-  setMessage("spinResult", "🎰 Крутим номер...");
-
-  let ticks = 0;
-
-  const animation = setInterval(() => {
-    display.textContent = randomPlate();
-    ticks++;
-
-    if (ticks >= 12) {
-      clearInterval(animation);
-
-      const rarity = Math.random() < 0.10 ? "Редкий" : "Обычный";
-      const plate = randomPlate();
-      const price = getNumberPrice(plate, rarity);
-      const date = new Date().toLocaleString("ru-RU");
-
-      user.numbers.push({
-        plate, rarity, price, sold: false, date
-      });
-
-      user.history.unshift({
-        plate, rarity, price, action: "Получен", date
-      });
-
-      saveCurrentUser(user);
-
-      display.textContent = plate;
-      display.style.borderColor =
-        rarity === "Редкий" ? "#f6c453" : "#dbe4ee";
-
-      setMessage(
-        "spinResult",
-        `${rarity}! ${plate} · Цена: ${price.toLocaleString("ru-RU")} монет`
-      );
-
-      button.disabled = false;
-      updateBalance();
-      renderAll();
-    }
-  }, 100);
-}
-
-// ---------- SHOP ----------
-
-function renderShop() {
-  const user = currentUser();
-  if (!user) return;
-
-  document.getElementById("carShop").innerHTML = cars.map(car => {
-    const owned = user.cars.some(item => item.id === car.id);
-
-    return `
-      <article class="item">
-        <h3>${car.emoji} ${escapeHTML(car.name)}</h3>
-        <p>Цена: ${car.price.toLocaleString("ru-RU")} монет</p>
-        <button ${owned ? "disabled" : ""} onclick="buyCar('${car.id}')">
-          ${owned ? "Уже куплено" : "Купить"}
-        </button>
-      </article>
-    `;
-  }).join("");
-
-  document.getElementById("numberShop").innerHTML = numberOffers.map((number, index) => `
-    <article class="item">
-      <div class="plate">${escapeHTML(number.plate)}</div>
-      <p class="rarity ${number.rarity === "Редкий" ? "rare" : ""}">
-        ${escapeHTML(number.rarity)}
-      </p>
-      <p>Цена: ${number.price.toLocaleString("ru-RU")} монет</p>
-      <button onclick="buyShopNumber(${index})">Купить номер</button>
-    </article>
-  `).join("");
-}
-
-function buyCar(carId) {
-  const user = currentUser();
-  const car = cars.find(item => item.id === carId);
-
-  if (!user || !car) return;
-
-  if (user.cars.some(item => item.id === car.id || item.name === car.name)) {
-    alert("Такая машина уже есть в гараже.");
-    return;
-  }
-
-  if (user.coins < car.price) {
-    alert("Недостаточно монет.");
-    return;
-  }
-
-  user.coins -= car.price;
-  user.cars.push({ ...car, installedPlate: null });
-
-  saveCurrentUser(user);
-  updateBalance();
-  renderAll();
-}
-
-function buyShopNumber(index) {
-  const user = currentUser();
-  const offer = numberOffers[index];
-
-  if (!user || !offer) return;
-
-  if (user.coins < offer.price) {
-    alert("Недостаточно монет.");
-    return;
-  }
-
-  user.coins -= offer.price;
-
-  user.numbers.push({
-    ...offer,
-    sold: false,
-    date: new Date().toLocaleString("ru-RU")
-  });
-
-  user.history.unshift({
-    ...offer,
-    action: "Куплен",
-    date: new Date().toLocaleString("ru-RU")
-  });
-
-  saveCurrentUser(user);
-  updateBalance();
-  renderAll();
-}
-
-// ---------- GARAGE ----------
-
-function renderGarage() {
-  const user = currentUser();
-  if (!user) return;
-
-  document.getElementById("garageCars").innerHTML = user.cars.length
-    ? user.cars.map((car, index) => `
-      <article class="item">
-        <h3>${car.emoji || "🚘"} ${escapeHTML(car.name)}</h3>
-        <p>Номер: ${escapeHTML(car.installedPlate || "Не установлен")}</p>
-        <button onclick="installPlate(${index})">Установить номер</button>
-      </article>
-    `).join("")
-    : "<p>Машин пока нет.</p>";
-
-  const available = user.numbers
-    .map((number, index) => ({ ...number, index }))
-    .filter(number => !number.sold);
-
-  document.getElementById("myNumbers").innerHTML = available.length
-    ? available.map(number => `
-      <article class="item">
-        <div class="plate">${escapeHTML(number.plate)}</div>
-        <p class="rarity ${number.rarity === "Редкий" ? "rare" : ""}">
-          ${escapeHTML(number.rarity)}
-        </p>
-        <p>Цена: ${Number(number.price).toLocaleString("ru-RU")} монет</p>
-        <button onclick="sellNumber(${number.index})">Продать номер</button>
-      </article>
-    `).join("")
-    : "<p>Номеров пока нет.</p>";
-}
-
-function installPlate(carIndex) {
-  const user = currentUser();
-  if (!user || !user.cars[carIndex]) return;
-
-  const available = user.numbers.filter(number => !number.sold);
-
-  if (!available.length) {
-    alert("Сначала получи или купи номер.");
-    return;
-  }
-
-  const choice = prompt(
-    "Введи номер из своей коллекции:\n" +
-    available.map(number => number.plate).join(", ")
-  );
-
-  if (!choice) return;
-
-  const number = available.find(
-    item => item.plate.toUpperCase() === choice.trim().toUpperCase()
-  );
-
-  if (!number) {
-    alert("Такого номера нет в твоей коллекции.");
-    return;
-  }
-
-  user.cars[carIndex].installedPlate = number.plate;
-  saveCurrentUser(user);
-  renderGarage();
-}
-
-// ---------- SELL ----------
-
-function sellNumber(index) {
-  const user = currentUser();
-  if (!user) return;
-
-  const number = user.numbers[index];
-  if (!number || number.sold) return;
-
-  const price = Number(number.price);
-
-  if (!Number.isFinite(price) || price < 0) {
-    alert("Ошибка цены номера.");
-    return;
-  }
-
-  if (!confirm(
-    `Продать ${number.plate} за ${price.toLocaleString("ru-RU")} монет?`
-  )) return;
-
-  number.sold = true;
-  user.coins += price;
-
-  user.history.unshift({
-    plate: number.plate,
-    rarity: number.rarity,
+  const number = {
+    id: Date.now() + Math.random(),
+    plate,
     price,
-    action: "Продан",
-    date: new Date().toLocaleString("ru-RU")
-  });
+    rarity: rare ? "Редкий" : "Обычный",
+    date: new Date().toLocaleString()
+  };
 
+  user.numbers.push(number);
+  user.history.unshift(number);
   saveCurrentUser(user);
+
+  document.getElementById("spinDisplay").textContent = plate;
+  message("spinResult", `${number.rarity}! Narxi: ${price.toLocaleString()} 🪙`);
+
   updateBalance();
-  renderAll();
+  renderGame();
 }
-
-// ---------- HISTORY ----------
-
-function renderHistory() {
-  const user = currentUser();
-  if (!user) return;
-
-  document.getElementById("historyList").innerHTML = user.history.length
-    ? user.history.map(item => `
-      <div class="historyEntry">
-        <b>${escapeHTML(item.plate)}</b> · ${escapeHTML(item.rarity)}
-        <br>Цена: ${Number(item.price).toLocaleString("ru-RU")} монет
-        <br>${escapeHTML(item.action || "Получен")}
-        <br><small>${escapeHTML(item.date || "")}</small>
-      </div>
-    `).join("")
-    : "<p>История пока пустая.</p>";
-}
-
-// ---------- PROMOS ----------
 
 function usePromo() {
   const user = currentUser();
@@ -626,14 +209,9 @@ function usePromo() {
   const code = document.getElementById("promoInput").value.trim().toUpperCase();
   const promo = getPromos()[code];
 
-  if (!promo) {
-    setMessage("promoMessage", "Промокод не найден.");
-    return;
-  }
-
+  if (!promo) return message("promoMessage", "Promokod topilmadi.");
   if (user.usedPromos.includes(code)) {
-    setMessage("promoMessage", "Ты уже использовал этот промокод.");
-    return;
+    return message("promoMessage", "Bu promokod oldin ishlatilgan.");
   }
 
   user.coins += Number(promo.amount);
@@ -641,161 +219,260 @@ function usePromo() {
 
   saveCurrentUser(user);
   updateBalance();
-
-  setMessage(
-    "promoMessage",
-    `Получено ${Number(promo.amount).toLocaleString("ru-RU")} монет!`
-  );
+  message("promoMessage", `${promo.amount} tanga qo‘shildi!`);
 }
 
-// ---------- ADMIN ----------
+function giveCoins() {
+  const username = document.getElementById("adminPlayer").value.trim();
+  const amount = Number(document.getElementById("adminCoins").value);
+  const accounts = getAccounts();
+
+  if (!accounts[username] || !Number.isFinite(amount) || amount <= 0) {
+    return message("adminMessage", "Login yoki miqdorni tekshiring.");
+  }
+
+  accounts[username].coins += Math.floor(amount);
+  saveAccounts(accounts);
+
+  message("adminMessage", "Tangalar berildi!");
+  renderAdmin();
+}
 
 function createPromo() {
-  if (!isAdmin()) return;
-
   const code = document.getElementById("newPromo").value.trim().toUpperCase();
   const amount = Number(document.getElementById("newPromoAmount").value);
 
-  if (!/^[A-Z0-9_-]{3,24}$/.test(code) ||
-      !Number.isSafeInteger(amount) || amount < 1) {
-    setMessage("adminMessage", "Проверь код и сумму награды.");
-    return;
+  if (!/^[A-Z0-9_-]{3,20}$/.test(code) ||
+      !Number.isFinite(amount) || amount <= 0) {
+    return message("adminMessage", "Promokod yoki mukofot noto‘g‘ri.");
   }
 
   const promos = getPromos();
 
   if (promos[code]) {
-    setMessage("adminMessage", "Этот промокод уже существует.");
-    return;
+    return message("adminMessage", "Bu promokod allaqachon mavjud.");
   }
 
-  promos[code] = { amount };
+  promos[code] = { amount: Math.floor(amount) };
   savePromos(promos);
 
-  setMessage("adminMessage", `Создан промокод ${code}.`);
+  message("adminMessage", "Promokod yaratildi!");
   renderAdmin();
 }
 
-function giveCoins() {
-  if (!isAdmin()) return;
+function buyCar(id) {
+  const user = currentUser();
+  if (!user) return;
 
-  const username = document.getElementById("adminPlayer").value.trim();
-  const amount = Number(document.getElementById("adminCoins").value);
-  const accounts = getAccounts();
-  const user = accounts[username];
+  const car = STARTER_CARS.find(item => item.id === id);
+  if (!car) return;
 
-  if (!user) {
-    setMessage("adminMessage", "Игрок не найден.");
+  if (user.cars.some(item => item.id === id)) {
+    return alert("Bu mashina garajingda bor.");
+  }
+
+  if (user.coins < car.price) {
+    return alert("Tangalar yetarli emas.");
+  }
+
+  user.coins -= car.price;
+  user.cars.push({ ...car });
+  saveCurrentUser(user);
+  updateBalance();
+  renderGame();
+}
+
+function buyNumber(id) {
+  const user = currentUser();
+  if (!user) return;
+
+  const number = user.numbers.find(item => item.id === id);
+  if (!number) return;
+
+  alert("Bu raqam allaqachon sening garajingda.");
+}
+
+function sellNumber(id) {
+  const user = currentUser();
+  if (!user) return;
+
+  const index = user.numbers.findIndex(item => item.id === id);
+  if (index === -1) return;
+
+  const number = user.numbers[index];
+
+  if (!confirm(`${number.plate} raqamini ${number.price.toLocaleString()} tangaga sotasanmi?`)) {
     return;
   }
 
-  if (!Number.isSafeInteger(amount) || amount < 1) {
-    setMessage("adminMessage", "Введи положительное количество монет.");
+  user.coins += number.price;
+  user.numbers.splice(index, 1);
+  saveCurrentUser(user);
+  updateBalance();
+  renderGame();
+}
+
+function sellCar(id) {
+  const user = currentUser();
+  if (!user) return;
+
+  const index = user.cars.findIndex(car => car.id === id);
+  if (index === -1) return;
+
+  const car = user.cars[index];
+  const refund = Math.floor(car.price * 0.7);
+
+  if (!confirm(`${car.name} mashinasini ${refund.toLocaleString()} tangaga sotasanmi?`)) {
     return;
   }
 
-  user.coins += amount;
-  accounts[username] = user;
-  saveAccounts(accounts);
-
-  setMessage(
-    "adminMessage",
-    `Игроку ${username} выдано ${amount.toLocaleString("ru-RU")} монет.`
-  );
-
-  renderAdmin();
+  user.coins += refund;
+  user.cars.splice(index, 1);
+  saveCurrentUser(user);
+  updateBalance();
+  renderGame();
 }
 
 function renderAdmin() {
-  if (!isAdmin()) return;
+  const players = document.getElementById("playersList");
+  const promoList = document.getElementById("promoList");
 
-  const players = Object.values(getAccounts());
+  players.replaceChildren();
+  promoList.replaceChildren();
 
-  document.getElementById("playersList").innerHTML = players.length
-    ? players.map(user => `
-      <div class="listEntry">
-        <b>${escapeHTML(user.username)}</b>
-        · ${Number(user.coins).toLocaleString("ru-RU")} монет
-      </div>
-    `).join("")
-    : "<p>Игроков пока нет.</p>";
+  Object.values(getAccounts()).forEach(user => {
+    const row = document.createElement("p");
+    row.textContent = `${user.username} — ${user.coins.toLocaleString()} 🪙`;
+    players.appendChild(row);
+  });
 
-  const promos = Object.entries(getPromos());
-
-  document.getElementById("promoList").innerHTML = promos.length
-    ? promos.map(([code, promo]) => `
-      <div class="listEntry">
-        <b>${escapeHTML(code)}</b>
-        — ${Number(promo.amount).toLocaleString("ru-RU")} монет
-        <button onclick="deletePromo('${encodeURIComponent(code)}')">
-          Удалить
-        </button>
-      </div>
-    `).join("")
-    : "<p>Промокодов пока нет.</p>";
+  Object.entries(getPromos()).forEach(([code, promo]) => {
+    const row = document.createElement("p");
+    row.textContent = `${code} — ${promo.amount} 🪙`;
+    promoList.appendChild(row);
+  });
 }
 
-function deletePromo(encodedCode) {
-  if (!isAdmin()) return;
+function renderGame() {
+  const user = currentUser();
+  if (!user) return;
 
-  const promos = getPromos();
-  delete promos[decodeURIComponent(encodedCode)];
-  savePromos(promos);
-  renderAdmin();
-}
+  document.getElementById("playerName").textContent = user.username;
 
-// ---------- REFRESH ----------
+  const carShop = document.getElementById("carShop");
+  const numberShop = document.getElementById("numberShop");
+  const garageCars = document.getElementById("garageCars");
+  const myNumbers = document.getElementById("myNumbers");
+  const historyList = document.getElementById("historyList");
 
-function renderAll() {
-  renderShop();
-  renderGarage();
-  renderHistory();
+  carShop.replaceChildren();
+  STARTER_CARS.forEach(car => {
+    const card = document.createElement("div");
+    card.className = "item";
+
+    const title = document.createElement("h3");
+    title.textContent = car.name;
+
+    const price = document.createElement("p");
+    price.textContent = `${car.price.toLocaleString()} 🪙`;
+
+    const button = document.createElement("button");
+    button.textContent = "Sotib olish";
+    button.onclick = () => buyCar(car.id);
+
+    card.append(title, price, button);
+    carShop.appendChild(card);
+  });
+
+  numberShop.innerHTML = "<p>Raqam olish uchun «Prokrutka» bo‘limiga kir.</p>";
+
+  garageCars.replaceChildren();
+  user.cars.forEach(car => {
+    const card = document.createElement("div");
+    card.className = "item";
+
+    const title = document.createElement("h3");
+    title.textContent = car.name;
+
+    const price = document.createElement("p");
+    price.textContent = `Xarid narxi: ${car.price.toLocaleString()} 🪙`;
+
+    const button = document.createElement("button");
+    button.textContent = "Mashina sotish (70%)";
+    button.onclick = () => sellCar(car.id);
+
+    card.append(title, price, button);
+    garageCars.appendChild(card);
+  });
+
+  myNumbers.replaceChildren();
+  user.numbers.forEach(number => {
+    const card = document.createElement("div");
+    card.className = "item";
+
+    const title = document.createElement("h3");
+    title.textContent = number.plate;
+
+    const price = document.createElement("p");
+    price.textContent = `${number.rarity} — ${number.price.toLocaleString()} 🪙`;
+
+    const button = document.createElement("button");
+    button.textContent = "Raqamni sotish";
+    button.onclick = () => sellNumber(number.id);
+
+    card.append(title, price, button);
+    myNumbers.appendChild(card);
+  });
+
+  historyList.replaceChildren();
+  user.history.forEach(item => {
+    const row = document.createElement("p");
+    row.textContent = `${item.plate} — ${item.rarity} — ${item.price.toLocaleString()} 🪙 — ${item.date}`;
+    historyList.appendChild(row);
+  });
 }
 
 function initialize() {
-  const accounts = getAccounts();
-  let changed = false;
-
-  // Исправляем старые профили без повторной выдачи стартового набора.
-  // Набор выдаётся только если у профиля ещё нет отметки.
-  for (const username of Object.keys(accounts)) {
-    const user = accounts[username];
-    if (!user || username === ADMIN_LOGIN) continue;
-
-    if (!user.starterPackApplied) {
-      if (!Array.isArray(user.cars)) user.cars = [];
-      if (!Array.isArray(user.numbers)) user.numbers = [];
-      if (!Array.isArray(user.history)) user.history = [];
-      if (!Array.isArray(user.usedPromos)) user.usedPromos = [];
-      if (!Number.isFinite(Number(user.coins))) user.coins = 0;
-
-      user.coins += STARTING_COINS;
-
-      for (const starter of STARTER_CARS) {
-        const exists = user.cars.some(car =>
-          car.id === starter.id ||
-          (car.name === starter.name && Number(car.price) === 0)
-        );
-        if (!exists) user.cars.push({ ...starter });
-      }
-
-      user.starterPackApplied = true;
-      changed = true;
-    }
-  }
-
-  if (changed) saveAccounts(accounts);
-
   const session = currentSession();
+  const authPanel = document.getElementById("authPanel");
+  const gamePanel = document.getElementById("gamePanel");
+  const adminNav = document.getElementById("adminNav");
 
-  if (session && session.admin && session.username === ADMIN_LOGIN) {
-    showAdminLogin();
-  } else if (currentUser()) {
-    enterGame();
-  } else {
-    document.getElementById("authPanel").hidden = false;
-    document.getElementById("gamePanel").hidden = true;
+  if (!session) {
+    authPanel.hidden = false;
+    gamePanel.hidden = true;
+    adminNav.hidden = true;
+    updateBalance();
+    return;
   }
+
+  if (session.admin) {
+    authPanel.hidden = true;
+    gamePanel.hidden = false;
+    adminNav.hidden = false;
+    document.getElementById("playerName").textContent = "Admin";
+    showTab("adminTab");
+    renderAdmin();
+    return;
+  }
+
+  const user = currentUser();
+
+  if (!user) {
+    logout();
+    return;
+  }
+
+  repairPlayer(user);
+  saveCurrentUser(user);
+
+  authPanel.hidden = true;
+  gamePanel.hidden = false;
+  adminNav.hidden = true;
+
+  updateBalance();
+  renderGame();
+  showTab("spinTab");
 }
 
 initialize();
